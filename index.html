@@ -160,32 +160,31 @@
     input.addEventListener('keypress', function(e) { if (e.key === 'Enter') enviarMensaje(); });
     document.getElementById('sendBtn').addEventListener('click', enviarMensaje);
 
-    // Carga mensajes del día via fetch
-    fetch(GAS_URL + '?action=cargar')
-      .then(function(r) { return r.json(); })
-      .then(function(mensajes) {
-        if (mensajes && mensajes.length > 0) {
-          mensajes.forEach(function(m) {
-            agregarMensajePantalla(m.profesor, m.texto, m.hora);
-          });
-        }
-      });
+    function cargarMensajes() {
+      var script = document.createElement('script');
+      script.src = GAS_URL + '?action=cargar&callback=recibirMensajes';
+      document.body.appendChild(script);
+    }
+
+    function recibirMensajes(mensajes) {
+      if (mensajes && mensajes.length > 0) {
+        mensajes.forEach(function(m) {
+          agregarMensajePantalla(m.profesor, m.texto, m.hora);
+        });
+      }
+    }
 
     function enviarMensaje() {
       var btn = document.getElementById('sendBtn');
       var texto = input.value.trim();
       if (!texto) return;
+
       input.disabled = true;
       btn.disabled = true;
       btn.style.opacity = '0.5';
 
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ texto: texto }),
-        headers: { 'Content-Type': 'text/plain' }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(r) {
+      var callbackName = 'cb_' + Date.now();
+      window[callbackName] = function(r) {
         input.disabled = false;
         btn.disabled = false;
         btn.style.opacity = '1';
@@ -196,7 +195,12 @@
           alert('Error: ' + r.error);
         }
         setTimeout(function() { input.focus(); }, 100);
-      });
+        delete window[callbackName];
+      };
+
+      var script = document.createElement('script');
+      script.src = GAS_URL + '?texto=' + encodeURIComponent(texto) + '&callback=' + callbackName;
+      document.body.appendChild(script);
     }
 
     function agregarMensajePantalla(profesor, texto, hora) {
@@ -210,6 +214,8 @@
       box.appendChild(div);
       box.scrollTop = 999999;
     }
+
+    cargarMensajes();
   </script>
 </body>
 </html>
